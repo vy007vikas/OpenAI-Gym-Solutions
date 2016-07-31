@@ -6,10 +6,10 @@ import tensorflow as tf
 env = gym.make('CartPole-v0')
 observation = env.reset()
 
-EPISODES = 10000
-TIMESTAMP = 500
+EPISODES = 20000
+TIMESTAMP = 1000
 GAMMA = 0.99
-ALPHA = 0.001
+ALPHA = 0.005
 MOMENTUM = 0.9
 explore_eps = 0.2
 IN = 4
@@ -31,13 +31,16 @@ class neuralNet:
 		self.B3 = tf.Variable(tf.zeros([o]))
 
 		self.Y1 = tf.nn.sigmoid(tf.matmul(self.X,self.W1) + self.B1)
-		self.Y2 = tf.nn.sigmoid(tf.matmul(self.Y1,self.W2) + self.B2)
+		self.Y2 = tf.nn.relu(tf.matmul(self.Y1,self.W2) + self.B2)
 		self.Y3 = tf.matmul(self.Y2,self.W3) + self.B3
 
-		self.L = tf.reduce_sum(tf.square(self.Y - tf.mul(self.Y3,self.C)))
+		self.reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+		self.reg_constant = 0.001  # Choose an appropriate one.
+		self.L = tf.reduce_sum(tf.square(self.Y - tf.mul(self.Y3,self.C))) + (self.reg_constant * sum(self.reg_losses))
 
-		self.optimizer = tf.train.MomentumOptimizer(ALPHA, MOMENTUM)
-		self.train_step = self.optimizer.minimize(self.L)
+		self.optimizerMSGD = tf.train.MomentumOptimizer(ALPHA, MOMENTUM)
+		self.optimizerRMS = tf.train.RMSPropOptimizer(learning_rate=ALPHA)
+		self.train_step = self.optimizerRMS.minimize(self.L)
 
 		self.sess.run(tf.initialize_all_variables())
 
@@ -72,8 +75,9 @@ def create_new_data(ot,re,ot2,reset,done,action):
 		data_batch['Y'] = np.append(data_batch['Y'],yval,axis=0)
 
 
-ans = 0
-ans1 = 0
+ans = np.zeros((12))
+anssum = np.zeros((12))
+
 for ep in range(EPISODES):
 	observation = env.reset()
 	reward = 0
@@ -87,7 +91,7 @@ for ep in range(EPISODES):
 		# print action, actionval
 
 		tempvar = random.random()
-		if tempvar < explore_eps and ep < 9000:      # dont explore for last 1000 episodes
+		if tempvar < max(explore_eps,(100.0/(ep+1))) and ep < 15000:      # dont explore for last 10000 episodes
 			action = env.action_space.sample()
 
 		# print action
@@ -102,10 +106,11 @@ for ep in range(EPISODES):
 		sum_reward = sum_reward + reward
 		if done :
 			nnet.train(data_batch['X'] , data_batch['Y'], data_batch['C'])
-			print("Episode finished after {} timesteps.", format(t+1))
-			ans = max(ans,t)
-			if ep > 9000:
-				ans1 = max(ans1,t)
+			print("Episode finished after {} timesteps.", ep ,  format(t+1))
+			ans[int(ep/5000)] = max(ans[int(ep/5000)],t)
+			anssum[int(ep/5000)] += anssum[int(ep/5000)]
 			break
 
-print ans
+for i in range(5):
+	print (i*5000 , " -- ", (i+1)*5000 , " == " , ans[i] , (anssum[i]/5000))
+
