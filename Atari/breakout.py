@@ -105,19 +105,20 @@ def create_new_data(ot,re,ot2,reset,done,action):
 	yval[0][action] = re
 	if not done:
 		yval[0][action] = re + GAMMA*y
-	data_batch['C'] = c
 	if reset:
 		data_batch['X'] = ot
 		data_batch['Y'] = yval
+		data_batch['C'] = c
 	else:
 		data_batch['X'] = np.append(data_batch['X'],ot,axis=0)
 		data_batch['Y'] = np.append(data_batch['Y'],yval,axis=0)
+		data_batch['C'] = np.append(data_batch['C'],c,axis=0)
 
 nnet = neuralNet()
 data_batch = {}
 sanity_check()
-ans = np.zeros((12))
-anssum = np.zeros((12))
+ans = np.zeros((22))
+anssum = np.zeros((22))
 for ep in range(EPISODES):
 	if (ep%1000)==999:
 		nnet.saveModel((ep/1000))
@@ -152,9 +153,9 @@ for ep in range(EPISODES):
 		if done or t == TIMESTAMP-1:
 			nnet.train(data_batch['X'] , data_batch['Y'], data_batch['C'])
 			print("Episode {0} finished after {1} timesteps.".format(ep+1,t+1))
-			ans[int(ep/5000)] = max(ans[int(ep/5000)],t)
-			anssum[int(ep/5000)] += anssum[int(ep/5000)]
+			ans[int(ep/1000)] = max(ans[int(ep/1000)],t)
+			anssum[int(ep/1000)] += anssum[int(ep/1000)]
 			break
 
 for i in range(3):
-	print (i*5000 , " -- ", (i+1)*5000 , " == " , ans[i] , (anssum[i]/5000))
+	print (i*1000 , " -- ", (i+1)*1000 , " == " , ans[i] , (anssum[i]/1000))

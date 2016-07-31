@@ -6,8 +6,8 @@ import tensorflow as tf
 env = gym.make('CartPole-v0')
 observation = env.reset()
 
-EPISODES = 20000
-TIMESTAMP = 1000
+EPISODES = 10000
+TIMESTAMP = 700
 GAMMA = 0.99
 ALPHA = 0.005
 MOMENTUM = 0.9
@@ -66,13 +66,14 @@ def create_new_data(ot,re,ot2,reset,done,action):
 	yval[0][action] = re
 	if not done:
 		yval[0][action] = re + GAMMA*y
-	data_batch['C'] = c
 	if reset:
 		data_batch['X'] = ot
 		data_batch['Y'] = yval
+		data_batch['C'] = c
 	else:
 		data_batch['X'] = np.append(data_batch['X'],ot,axis=0)
 		data_batch['Y'] = np.append(data_batch['Y'],yval,axis=0)
+		data_batch['C'] = np.append(data_batch['C'],c,axis=0)
 
 
 ans = np.zeros((12))
@@ -91,7 +92,7 @@ for ep in range(EPISODES):
 		# print action, actionval
 
 		tempvar = random.random()
-		if tempvar < max(explore_eps,(100.0/(ep+1))) and ep < 15000:      # dont explore for last 10000 episodes
+		if tempvar < max(explore_eps,(1000.0/(ep+1))) and ep < 8000:      # dont explore for last 10000 episodes
 			action = env.action_space.sample()
 
 		# print action
@@ -107,10 +108,10 @@ for ep in range(EPISODES):
 		if done :
 			nnet.train(data_batch['X'] , data_batch['Y'], data_batch['C'])
 			print("Episode finished after {} timesteps.", ep ,  format(t+1))
-			ans[int(ep/5000)] = max(ans[int(ep/5000)],t)
-			anssum[int(ep/5000)] += anssum[int(ep/5000)]
+			ans[int(ep/1000)] = max(ans[int(ep/1000)],t)
+			anssum[int(ep/1000)] += anssum[int(ep/1000)]
 			break
 
 for i in range(5):
-	print (i*5000 , " -- ", (i+1)*5000 , " == " , ans[i] , (anssum[i]/5000))
+	print (i*1000 , " -- ", (i+1)*1000 , " == " , ans[i] , (anssum[i]/1000))
 
