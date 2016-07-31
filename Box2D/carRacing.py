@@ -1,18 +1,19 @@
 import gym
 import numpy as np
 import random
+from scipy import misc
 import tensorflow as tf
 
 env = gym.make('CarRacing-v0')
 observation = env.reset()
 
-EPISODES = 1
-TIMESTAMP = 100
+EPISODES = 0
+TIMESTAMP = 1
 GAMMA = 0.99
 ALPHA = 0.001
 explore_eps = 1
 N = 50
-OUT = 2
+OUT = 3
 BATCH_SIZE = 4
 
 def conv2d(x,W,stride):
@@ -33,10 +34,10 @@ class neuralNet:
 		self.B_conv1 = tf.Variable(tf.zeros([32]))
 
 		self.W_conv2 = tf.Variable(tf.truncated_normal([5,5,32,64],stddev = 0.1))       # 15 * 15 * 32
-		self.B_conv2 = tf.Variable(tf.zeros([32]))
+		self.B_conv2 = tf.Variable(tf.zeros([64]))
 
 		self.W_conv3 = tf.Variable(tf.truncated_normal([3,3,64,64],stddev = 0.1))       # 6 * 6 * 64
-		self.B_conv3 = tf.Variable(tf.zeros([32]))
+		self.B_conv3 = tf.Variable(tf.zeros([64]))
 
 		self.W_fc1 = tf.Variable(tf.truncated_normal([ 4*4*64 , 512],stddev = 0.1))     # 4 * 4 * 64
 		self.B_fc1 = tf.Variable(tf.zeros([512]))
@@ -44,14 +45,13 @@ class neuralNet:
 		self.W_fc2 = tf.Variable(tf.truncated_normal([512,OUT],stddev = 0.1))
 		self.B_fc2 = tf.Variable(tf.zeros([OUT]))
 
-
 		o_conv1 = tf.nn.relu(conv2d(self.X,self.W_conv1,3) + self.B_conv1)
 		o_pool1 = max_pool_2x2(o_conv1)
 
 		o_conv2 = tf.nn.relu(conv2d(o_pool1,self.W_conv2,2) + self.B_conv2)
 
 		o_conv3 = tf.nn.relu(conv2d(o_conv2,self.W_conv3,1) + self.B_conv3)
-		o_fconv3 = tf.nn.reshape(o_conv3,[-1,4*4*64])
+		o_fconv3 = tf.reshape(o_conv3,[-1,4*4*64])
 
 		o_fc1 = tf.nn.relu(tf.matmul(o_fconv3,self.W_fc1) + self.B_fc1)
 
@@ -73,54 +73,60 @@ class neuralNet:
 		self.train_step.run(feed_dict={self.X:x , self.Y:y, self.C:c})
 
 
+def sanity_check():
+	observation = env.reset()
+	print observation.shape
+	print(env.action_space)
+	print(env.observation_space)
+	print(env.observation_space.high)
+	print(env.observation_space.low)
+
+def process_image(ot):
+	ot = misc.imresize(ot , (50,50,3) )
+	ot = 0.299*ot[:,:,0] + 0.587*ot[:,:,1] + 0.114*ot[:,:,2]
+	ot = np.reshape(ot , (N,N,1))
+	return ot
+
+def create_new_data(ot,re,ot2,reset,done,action):
+	c = np.zeros((1,OUT))
+	c[0][action] = 1
+	yval = np.zeros((1,OUT))
+	x , y = nnet.forward_pass(ot2)
+	yval[0][action] = re
+	if not done:
+		yval[0][action] = re + GAMMA*y
+	data_batch['C'] = c
+	if reset:
+		data_batch['X'] = ot
+		data_batch['Y'] = yval
+	else:
+		data_batch['X'] = np.append(data_batch['X'],ot,axis=0)
+		data_batch['Y'] = np.append(data_batch['Y'],yval,axis=0)
 
 nnet = neuralNet()
 data_batch = {}
-
-def create_new_data(ot,re,ot2,reset,done,action):
-	print  ot
-	print ot.shape
-	ot = ot.reshape((-1,N,N,3))
-	print ot.shape
-	print ot
-	# c = np.zeros((1,OUT))
-	# c[0][action] = 1
-	# yval = np.zeros((1,OUT))
-	# x , y = nnet.forward_pass(ot2)
-	# yval[0][action] = re
-	# if not done:
-	# 	yval[0][action] = re + GAMMA*y
-	# data_batch['C'] = c
-	# if reset:
-	# 	data_batch['X'] = ot
-	# 	data_batch['Y'] = yval
-	# else:
-	# 	data_batch['X'] = np.append(data_batch['X'],ot,axis=0)
-	# 	data_batch['Y'] = np.append(data_batch['Y'],yval,axis=0)
-
-
 ans = 0
 ans1 = 0
 for ep in range(EPISODES):
 	observation = env.reset()
-	print observation
-	print observation.shape
+	observation = process_image(observation)
 	reward = 0
 	sum_reward = 0
 	data_batch = {}
 	reset = True
-	for t in range(0):
+	for t in range(TIMESTAMP):
 		env.render()
 		x = np.array(observation)
-		# action, actionval = nnet.forward_pass(x)
+		action, actionval = nnet.forward_pass(x)
 		# print action, actionval
 
 		tempvar = random.random()
-		if tempvar < max((10/ep),explore_eps) and ep < 9000:      # dont explore for last 1000 episodes
+		if tempvar < max((500/(ep+1)),explore_eps) and ep < 9000:      # dont explore for last 1000 episodes
 			action = env.action_space.sample()
 
 		# print action
 		observation, reward, done, info = env.step(action)
+		observation = process_image(observation)
 		create_new_data(x,reward,np.array(observation),reset,done,action)
 		reset = False
 
