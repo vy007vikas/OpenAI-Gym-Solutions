@@ -8,13 +8,13 @@ env = gym.make('Breakout-v0')
 observation = env.reset()
 
 EPISODES = 20000
-TIMESTAMP = 5000
+TIMESTAMP = 2000
 GAMMA = 0.99
-ALPHA = 0.001
-explore_eps = 1
+ALPHA = 0.005
+explore_eps = 0.2
 N = 50
 OUT = 6
-BATCH_SIZE = 4
+BATCH_SIZE = 32
 
 def conv2d(x,W,stride):
 	return tf.nn.conv2d(x,W,strides=[1,stride,stride,1],padding='SAME')
@@ -63,6 +63,7 @@ class neuralNet:
 		self.train_step = self.optimizer.minimize(self.L)
 
 		self.sess.run(tf.initialize_all_variables())
+		self.saver = tf.train.Saver()
 
 	def forward_pass(self,x):
 		out = self.o_fc2.eval(feed_dict={self.X:x})
@@ -72,6 +73,13 @@ class neuralNet:
 	def train(self,x,y,c):
 		self.train_step.run(feed_dict={self.X:x , self.Y:y, self.C:c})
 
+	def saveModel(self,index):
+		save_path = self.saver.save(self.sess, str("./breakout_model/model" + str(index) + ".ckpt"))
+		print("Model saved in file: %s" % save_path)
+
+	def loadModel(self,index):
+		self.saver.restore(self.sess, str("./breakout_model/model" + str(index) + ".ckpt"))
+		print("Model restored.")
 
 def sanity_check():
 	observation = env.reset()
@@ -111,6 +119,8 @@ sanity_check()
 ans = np.zeros((12))
 anssum = np.zeros((12))
 for ep in range(EPISODES):
+	if (ep%1000)==999:
+		nnet.saveModel((ep/1000))
 	observation = env.reset()
 	observation = process_image(observation)
 	reward = 0
@@ -124,7 +134,7 @@ for ep in range(EPISODES):
 		# print action, actionval
 
 		tempvar = random.random()
-		if tempvar < max((1000/(ep+1)),explore_eps) and ep < 15000:      # dont explore for last 5000 episodes
+		if tempvar < max((1000.0/(ep+1)),explore_eps) and ep < 15000:      # dont explore for last 5000 episodes
 			action = env.action_space.sample()
 
 		# print action
